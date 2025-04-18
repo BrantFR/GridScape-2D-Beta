@@ -53,10 +53,35 @@
       align-items: center;
     }
 
-    #colorButtons {
+    .color-bar-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      gap: 8px;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .color-bar {
+      display: flex;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 10px 14px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(10px);
+      transition: max-height 0.4s ease, opacity 0.3s ease;
+      overflow: hidden;
+      opacity: 1;
+      max-height: 100px;
+    }
+
+    .color-bar.hidden {
+      opacity: 0;
+      max-height: 0;
+      pointer-events: none;
     }
 
     .color-button {
@@ -75,6 +100,23 @@
     .color-button.active {
       border-color: #fff;
       box-shadow: 0 0 0 2px rgba(0,0,0,0.3);
+    }
+
+    .color-toggle-btn {
+      margin-top: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      transition: background 0.2s;
+    }
+
+    .color-toggle-btn:hover {
+      background: rgba(0, 0, 0, 0.4);
     }
 
     .info {
@@ -116,6 +158,7 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+
   <div id="ui">
     <div class="ui-section">
       <button id="zoomInBtn" class="tool-button">🔍 Zoom In</button>
@@ -123,19 +166,26 @@
       <button id="toggleDragBtn" class="tool-button">🧲 Toggle Drag</button>
     </div>
     <div class="ui-section">
-      <div id="colorButtons"></div>
       <button id="toggleTool" class="tool-button">🛠 Build Mode</button>
       <button id="saveBtn" class="tool-button">💾 Save</button>
       <button id="loadBtn" class="tool-button">📂 Load</button>
+      <button id="clearBtn" class="tool-button">🧹 Clear</button>
       <button id="modeToggleBtn" class="tool-button">🌙 Dark Mode</button>
       <div class="info">Press <strong>G</strong> to toggle grid</div>
     </div>
   </div>
+
+  <!-- 🎨 Collapsible color palette -->
+  <div class="color-bar-container">
+    <div id="colorButtons" class="color-bar"></div>
+    <button id="togglePaletteBtn" class="color-toggle-btn">🎨 Show/Hide Colors</button>
+  </div>
+
   <div id="watermark">GridScape 2D</div>
+
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
@@ -158,14 +208,27 @@
       { name: "Blue", value: "#2196F3" },
       { name: "Red", value: "#F44336" },
       { name: "Yellow", value: "#FFEB3B" },
-      { name: "Purple", value: "#9C27B0" }
+      { name: "Purple", value: "#9C27B0" },
+      { name: "Orange", value: "#FF9800" },
+      { name: "Pink", value: "#E91E63" },
+      { name: "Cyan", value: "#00BCD4" },
+      { name: "Lime", value: "#CDDC39" },
+      { name: "Teal", value: "#009688" },
+      { name: "Indigo", value: "#3F51B5" },
+      { name: "Amber", value: "#FFC107" },
+      { name: "Brown", value: "#795548" },
+      { name: "Gray", value: "#9E9E9E" },
+      { name: "White", value: "#FAFAFA" }
     ];
     let currentColorIndex = 0;
 
     const colorButtonsDiv = document.getElementById("colorButtons");
+    const togglePaletteBtn = document.getElementById("togglePaletteBtn");
+
     const toggleToolBtn = document.getElementById("toggleTool");
     const saveBtn = document.getElementById("saveBtn");
     const loadBtn = document.getElementById("loadBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const zoomInBtn = document.getElementById("zoomInBtn");
     const zoomOutBtn = document.getElementById("zoomOutBtn");
     const toggleDragBtn = document.getElementById("toggleDragBtn");
@@ -259,14 +322,11 @@
     canvas.addEventListener("wheel", (event) => {
       event.preventDefault();
       const { offsetX: mx, offsetY: my } = event;
-
       const zoomAmount = event.deltaY < 0 ? 1.1 : 0.9;
       const newZoomLevel = Math.min(3, Math.max(0.5, zoomLevel * zoomAmount));
       const scaleChange = newZoomLevel / zoomLevel;
-
       offsetX = mx - (mx - offsetX) * scaleChange;
       offsetY = my - (my - offsetY) * scaleChange;
-
       zoomLevel = newZoomLevel;
       drawBlocks();
     });
@@ -275,16 +335,6 @@
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       drawBlocks();
-    });
-
-    window.addEventListener("keydown", (event) => {
-      if (event.key >= "1" && event.key <= "5") {
-        currentColorIndex = parseInt(event.key) - 1;
-        updateColorButtons();
-      } else if (event.key.toLowerCase() === "g") {
-        showGrid = !showGrid;
-        drawBlocks();
-      }
     });
 
     toggleToolBtn.addEventListener("click", () => {
@@ -314,14 +364,11 @@
       }
     });
 
-    zoomInBtn.addEventListener("click", () => {
-      zoomLevel = Math.min(zoomLevel + 0.25, 3);
-      drawBlocks();
-    });
-
-    zoomOutBtn.addEventListener("click", () => {
-      zoomLevel = Math.max(zoomLevel - 0.25, 0.5);
-      drawBlocks();
+    clearBtn.addEventListener("click", () => {
+      if (confirm("Clear all blocks?")) {
+        blocks.length = 0;
+        drawBlocks();
+      }
     });
 
     modeToggleBtn.addEventListener("click", () => {
@@ -330,6 +377,10 @@
       document.body.classList.toggle("light-mode", !isDarkMode);
       modeToggleBtn.textContent = isDarkMode ? "☀️ Light Mode" : "🌙 Dark Mode";
       drawBlocks();
+    });
+
+    togglePaletteBtn.addEventListener("click", () => {
+      colorButtonsDiv.classList.toggle("hidden");
     });
 
     colors.forEach((color, index) => {
@@ -350,6 +401,28 @@
         btn.classList.toggle("active", i === currentColorIndex);
       });
     }
+
+    window.addEventListener("beforeunload", () => {
+      const prefs = {
+        darkMode: isDarkMode,
+        showGrid: showGrid,
+        zoom: zoomLevel,
+      };
+      localStorage.setItem("builderPrefs", JSON.stringify(prefs));
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const prefs = JSON.parse(localStorage.getItem("builderPrefs"));
+      if (prefs) {
+        isDarkMode = prefs.darkMode;
+        showGrid = prefs.showGrid;
+        zoomLevel = prefs.zoom;
+        document.body.classList.toggle("dark-mode", isDarkMode);
+        document.body.classList.toggle("light-mode", !isDarkMode);
+        modeToggleBtn.textContent = isDarkMode ? "☀️ Light Mode" : "🌙 Dark Mode";
+      }
+      drawBlocks();
+    });
 
     drawBlocks();
   </script>
